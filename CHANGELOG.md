@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.3] - 2026-03-09
+
+### Added
+- feat: split release workflow into prepare and publish (#1) (d8d860f)
+
+### Fixed
+- fix: Session manager batching improvements (#298) (328acba)
+- fix: allow custom HTTP status codes from entrypoint handlers (#284) (#296) (2371461)
+
 ## [1.4.2] - 2026-03-03
 
 ### Added
