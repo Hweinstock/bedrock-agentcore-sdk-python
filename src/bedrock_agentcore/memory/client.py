@@ -1259,6 +1259,33 @@ class MemoryClient:
             logger.error("Failed to delete memory: %s", e)
             raise
 
+    def update_stream_delivery_config(
+        self,
+        memory_id: str,
+        stream_delivery_resources: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Update the stream delivery configuration for a memory.
+
+        Args:
+            memory_id: Memory resource ID
+            stream_delivery_resources: Delivery configuration for streaming memory records
+
+        Returns:
+            Updated memory object
+        """
+        try:
+            response = self.gmcp_client.update_memory(
+                memoryId=memory_id,
+                clientToken=str(uuid.uuid4()),
+                streamDeliveryResources=stream_delivery_resources,
+            )
+            memory = self._normalize_memory_response(response["memory"])
+            logger.info("Updated stream delivery config for memory: %s", memory_id)
+            return memory
+        except ClientError as e:
+            logger.error("Failed to update stream delivery config: %s", e)
+            raise
+
     def delete_memory_and_wait(self, memory_id: str, max_wait: int = 300, poll_interval: int = 10) -> Dict[str, Any]:
         """Delete a memory and wait for deletion to complete.
 
