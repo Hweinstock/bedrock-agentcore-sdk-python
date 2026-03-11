@@ -6,6 +6,7 @@ import warnings
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+import pytest
 from botocore.exceptions import ClientError
 
 from bedrock_agentcore.memory import MemoryClient
@@ -763,6 +764,66 @@ def test_delete_memory():
             args, kwargs = mock_gmcp.delete_memory.call_args
             assert kwargs["memoryId"] == "mem-123"
             assert kwargs["clientToken"] == "12345678-1234-5678-1234-567812345678"
+
+
+def test_update_stream_delivery_config():
+    """Test update_stream_delivery_config passes config and normalizes response."""
+    with patch("boto3.client"):
+        client = MemoryClient()
+
+        mock_gmcp = MagicMock()
+        client.gmcp_client = mock_gmcp
+
+        delivery_config = {
+            "resources": [
+                {
+                    "kinesis": {
+                        "dataStreamArn": "arn:aws:kinesis:us-west-2:123456789012:stream/test",
+                        "contentConfigurations": [{"type": "MEMORY_RECORDS", "level": "FULL_CONTENT"}],
+                    }
+                }
+            ]
+        }
+
+        mock_gmcp.update_memory.return_value = {
+            "memory": {
+                "memoryId": "mem-123",
+                "status": "ACTIVE",
+                "streamDeliveryResources": delivery_config,
+            }
+        }
+
+        with patch("uuid.uuid4", return_value=uuid.UUID("12345678-1234-5678-1234-567812345678")):
+            result = client.update_stream_delivery_config(
+                memory_id="mem-123", stream_delivery_resources=delivery_config
+            )
+
+            assert result["memoryId"] == "mem-123"
+            assert result["id"] == "mem-123"
+            assert result["streamDeliveryResources"] == delivery_config
+
+            args, kwargs = mock_gmcp.update_memory.call_args
+            assert kwargs["memoryId"] == "mem-123"
+            assert kwargs["clientToken"] == "12345678-1234-5678-1234-567812345678"
+            assert kwargs["streamDeliveryResources"] == delivery_config
+            assert set(kwargs.keys()) == {"memoryId", "clientToken", "streamDeliveryResources"}
+
+
+def test_update_stream_delivery_config_client_error():
+    """Test update_stream_delivery_config raises ClientError."""
+    with patch("boto3.client"):
+        client = MemoryClient()
+
+        mock_gmcp = MagicMock()
+        client.gmcp_client = mock_gmcp
+
+        mock_gmcp.update_memory.side_effect = ClientError(
+            {"Error": {"Code": "ResourceNotFoundException", "Message": "Not found"}},
+            "UpdateMemory",
+        )
+
+        with pytest.raises(ClientError):
+            client.update_stream_delivery_config(memory_id="mem-999", stream_delivery_resources={})
 
 
 def test_get_memory_status():
