@@ -10,6 +10,8 @@ import boto3
 from botocore.config import Config as BotocoreConfig
 from botocore.exceptions import ClientError
 
+from bedrock_agentcore._utils.boto3_wrapper import wrap_boto3_method
+
 from .constants import BlobMessage, ConversationalMessage, MessageRole, RetrievalConfig
 from .models import (
     ActorSummary,
@@ -240,7 +242,7 @@ class MemorySessionManager:
         if name in self._ALLOWED_DATA_PLANE_METHODS and hasattr(self._data_plane_client, name):
             method = getattr(self._data_plane_client, name)
             logger.debug("Forwarding method '%s' to _data_plane_client", name)
-            return method
+            return wrap_boto3_method(method)
 
         # Method not found on client
         raise AttributeError(
@@ -559,9 +561,10 @@ class MemorySessionManager:
         session_id: str,
         branch_name: Optional[str] = None,
         include_parent_branches: bool = False,
-        eventMetadata: Optional[List[EventMetadataFilter]] = None,
+        event_metadata: Optional[List[EventMetadataFilter]] = None,
         max_results: int = 100,
         include_payload: bool = True,
+        **kwargs: Any,
     ) -> List[Event]:
         """List all events in a session with pagination support.
 
@@ -573,7 +576,8 @@ class MemorySessionManager:
             session_id: Session identifier
             branch_name: Optional branch name to filter events (None for all branches)
             include_parent_branches: Whether to include parent branch events (only applies with branch_name)
-            eventMetadata: Optional list of event metadata filters to apply
+            eventMetadata: Optional list of event metadata filters to apply.
+                Accepts both ``event_metadata`` (preferred) and ``eventMetadata`` (legacy).
             max_results: Maximum number of events to return
             include_payload: Whether to include event payloads in response
 
@@ -633,6 +637,17 @@ class MemorySessionManager:
             )
             ```
         """
+        # Backward compat: accept legacy camelCase kwarg
+        if "eventMetadata" in kwargs:
+            if event_metadata is not None:
+                raise TypeError(
+                    "Got both 'event_metadata' and 'eventMetadata' for the same parameter. "
+                    "Use one or the other."
+                )
+            event_metadata = kwargs.pop("eventMetadata")
+        if kwargs:
+            raise TypeError(f"list_events() got unexpected keyword arguments: {list(kwargs)}")
+
         try:
             all_events: List[Event] = []
             next_token = None
@@ -653,19 +668,18 @@ class MemorySessionManager:
                 if next_token:
                     params["nextToken"] = next_token
 
-                # Initialize the filterMap
-                filterMap = {}
+                filter_map = {}
 
                 # Add branch filter if specified (but not for "main")
                 if branch_name and branch_name != "main":
-                    filterMap["branch"] = {"name": branch_name, "includeParentBranches": include_parent_branches}
+                    filter_map["branch"] = {"name": branch_name, "includeParentBranches": include_parent_branches}
 
                 # Add eventMetadata filter if specified
-                if eventMetadata:
-                    filterMap["eventMetadata"] = eventMetadata  # type: ignore[assignment]
+                if event_metadata:
+                    filter_map["eventMetadata"] = event_metadata  # type: ignore[assignment]
 
-                if filterMap:
-                    params["filter"] = filterMap
+                if filter_map:
+                    params["filter"] = filter_map
 
                 response = self._data_plane_client.list_events(**params)
 
@@ -1228,17 +1242,29 @@ class MemorySession(DictWrapper):
         self,
         branch_name: Optional[str] = None,
         include_parent_branches: bool = False,
-        eventMetadata: Optional[List[EventMetadataFilter]] = None,
+        event_metadata: Optional[List[EventMetadataFilter]] = None,
         max_results: int = 100,
         include_payload: bool = True,
+        **kwargs: Any,
     ) -> List[Event]:
         """Delegates to manager.list_events."""
+        # Backward compat: accept legacy camelCase kwarg
+        if "eventMetadata" in kwargs:
+            if event_metadata is not None:
+                raise TypeError(
+                    "Got both 'event_metadata' and 'eventMetadata' for the same parameter. "
+                    "Use one or the other."
+                )
+            event_metadata = kwargs.pop("eventMetadata")
+        if kwargs:
+            raise TypeError(f"list_events() got unexpected keyword arguments: {list(kwargs)}")
+
         return self._manager.list_events(
             actor_id=self._actor_id,
             session_id=self._session_id,
             branch_name=branch_name,
             include_parent_branches=include_parent_branches,
-            eventMetadata=eventMetadata,
+            event_metadata=event_metadata,
             include_payload=include_payload,
             max_results=max_results,
         )
