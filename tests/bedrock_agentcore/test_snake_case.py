@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from bedrock_agentcore._utils.snake_case import snake_to_camel, accept_snake_case_kwargs
+from bedrock_agentcore._utils.snake_case import snake_to_camel, accept_snake_case_kwargs, deprecated_alias
 
 
 class TestSnakeToCamel:
@@ -99,3 +99,42 @@ class TestAcceptSnakeCaseKwargs:
 
         wrapped = accept_snake_case_kwargs(my_boto3_method)
         assert wrapped.__name__ == "my_boto3_method"
+
+
+class TestDeprecatedAlias:
+    """Tests for deprecated_alias utility."""
+
+    def test_old_name_extracted(self):
+        kwargs = {"oldParam": "value"}
+        result, remaining = deprecated_alias(kwargs, "oldParam", "new_param")
+        assert result == "value"
+        assert remaining == {}
+
+    def test_new_name_in_kwargs_extracted(self):
+        kwargs = {"new_param": "value"}
+        result, remaining = deprecated_alias(kwargs, "oldParam", "new_param")
+        assert result == "value"
+        assert remaining == {}
+
+    def test_neither_present_returns_none(self):
+        kwargs = {"unrelated": "value"}
+        result, remaining = deprecated_alias(kwargs, "oldParam", "new_param")
+        assert result is None
+        assert remaining == {"unrelated": "value"}
+
+    def test_both_raises_type_error(self):
+        kwargs = {"oldParam": "v1", "new_param": "v2"}
+        with pytest.raises(TypeError, match="new_param.*oldParam"):
+            deprecated_alias(kwargs, "oldParam", "new_param")
+
+    def test_old_name_removed_from_kwargs(self):
+        kwargs = {"oldParam": "value", "other": "keep"}
+        result, remaining = deprecated_alias(kwargs, "oldParam", "new_param")
+        assert "oldParam" not in remaining
+        assert remaining == {"other": "keep"}
+
+    def test_empty_kwargs(self):
+        kwargs = {}
+        result, remaining = deprecated_alias(kwargs, "oldParam", "new_param")
+        assert result is None
+        assert remaining == {}

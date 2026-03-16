@@ -1913,7 +1913,7 @@ class TestSession:
                     session_id="session-456",
                     branch_name="test-branch",
                     include_parent_branches=False,
-                    eventMetadata=None,
+                    event_metadata=None,
                     include_payload=True,
                     max_results=100,
                 )
@@ -2472,7 +2472,7 @@ class TestEventMetadataFlow:
                 session_id="session-456",
                 branch_name="test-branch",
                 include_parent_branches=True,
-                eventMetadata=event_metadata_filter,
+                event_metadata=event_metadata_filter,
             )
 
             assert len(result) == 1
@@ -2511,7 +2511,7 @@ class TestEventMetadataFlow:
                     session_id="session-456",
                     branch_name="test-branch",
                     include_parent_branches=False,
-                    eventMetadata=event_metadata_filter,
+                    event_metadata=event_metadata_filter,
                     include_payload=True,
                     max_results=100,
                 )
